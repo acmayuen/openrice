@@ -1,4 +1,4 @@
-# openrice
-The purpose of this project is going to web-scrape openrice restaurant detail, comment and rating information and performing fake rating / comment by using machine learning method.
+# openrice data mining project
+## The purpose of this project is to learn webscraping and text mining through a famous food critics web site.
 
-(New code and data will be updated later but the scraper may cause ip blocking due to frequently attempt)
+## The first to be done will be building a webscraper to extract restaurant detail, comment and rating information.  Then I will use text mining algorithm to analyze the comment as well as using machine learning method for clustering and prediction.
