@@ -1,0 +1,490 @@
+---
+title: "開飯的機器學習文字挖掘應用"
+#output: flexdashboard::flex_dashboard
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    social: menu
+    vertical_layout: scroll
+    theme: cosmo
+runtime: shiny
+---
+
+<style type="text/css">
+body, td {font-size: 25px;}
+code.r{font-size: 14px;}
+pre {font-size: 18px}
+
+.navbar {background-color:#efc640;border-color:black;}
+.navbar-brand {color:black!important;font-size: 28px;}
+.sidebar {background: #f7eeca !important;}
+
+</style>
+
+```{r global, include=FALSE}
+# load data in 'global' chunk so it can be shared by all users of the dashboard
+library(jiebaR)
+library(jiebaRD)
+library(wordcloud2)
+library(tm)
+library(stringr)
+library(plyr)
+library(dplyr)
+library(class)
+library(datasets)
+library(shiny)
+library(shinydashboard)
+library(flexdashboard)
+library(plotly)
+library(rsconnect)
+
+df<-read.csv("highlistpref.csv",stringsAsFactors = F)
+jseg <- worker(user="dictionary.txt",stop_word = "stopword.txt",dict="jieba.dict.utf8",hmm="hmm_model.utf8",idf = "idf.utf8")
+new_user_word(jseg,c(
+  "唔覺","揀唔落","不過不失","幾好","唔好","唔得","唔掂","難食"))
+```
+
+```{r}
+df$sum   <- df$taste+df$env+df$serv+df$hyg+df$cp
+df$avg   <- df$sum/5
+df$date1 <- as.Date(df$date1)
+df$comm  <- as.character(df$comm)
+df$user  <- as.character(df$user)
+df$lg    <- nchar(df$comm)
+df$comm  <- gsub("[0-9]","",df$comm)
+df$comm  <- gsub("[A-z]","",df$comm)
+df <- as.data.frame(df)
+
+ids     <- reactive({input$n_breaks})
+shop.sl <- reactive({subset(df, id == ids())})
+ze      <- reactive({input$zero})
+lc      <- reactive({input$lat.comm})
+dp      <- reactive({input$dateip})
+
+shop.pick <- reactive({
+  xx <- shop.sl()
+  xx <- if (ze() == TRUE){xx[xx$sum!=0, ]}else xx
+  xx <- if (lc() == TRUE){xx%>%group_by(user)%>%filter(date1==max(date1))}else xx
+  xx <- subset(xx, date1 >= as.Date(dp())) #date after
+  xx <- as.data.frame(xx)
+  return(xx)
+})
+```
+
+評分比較
+================================================
+
+Column {.sidebar data-width=300 }
+-----------------------------------------------------------------------
+
+###
+
+請選擇條件:
+```{r}
+selectInput("n_breaks", label = "餐廳名稱",
+            choices = c(
+              "Amaroni's"=61,"澳洲牛奶公司"=90,"松記糖水 "=468,"帝苑餅店 "=778,"清真牛肉館"=1441,
+              "再興燒臘飯店"=1491,"金鳳茶餐廳 "=1549,"九記牛腩 "=1618,"公和荳品廠 "=1754,
+              "蘭芳園"=1814,"蓮香樓"=1868,"文華餅店"=2020), selected = "蘭芳園")
+checkboxInput('zero', '不包括零分評論?', value = TRUE)
+checkboxInput('lat.comm', '只計算同一用家於同一餐廳最近食評', value = TRUE)
+sliderInput("wcsize", label = "文字雲最少出現次數:",
+            min = 1, max = 20, value = 5, step = 1)
+sliderInput("topx", label = "N大最高出現次數:",
+            min = 1, max = 20, value = 10, step = 1)
+dateInput("dateip", "開始計算日期:", max = "2017-08-15", value = "2015-01-01")
+```
+
+
+Row {data-height=80}
+-----------------------------------------------------------------------
+
+###
+```{r}
+#renderText({print("")})
+renderValueBox({
+valueBox("已選定條件評論資料", caption = " ",color='#c17028')
+})
+```
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Smile
+```{r}
+renderValueBox({
+valueBox(sum(shop.pick()$pref == "smile"), caption = "開心", icon="ion-happy-outline",color='#efc640')
+})
+```
+
+### OK
+```{r}
+renderValueBox({
+valueBox(sum(shop.pick()$pref == "ok"), caption = "OK啦", icon="ion-checkmark",color='#efc640')
+})
+```
+
+### Cry
+```{r}
+renderValueBox({
+valueBox(sum(shop.pick()$pref == "cry"), caption = "唔掂", icon="ion-sad-outline",color='#efc640')
+})
+```
+
+### Not Provided
+```{r}
+renderValueBox({
+valueBox(sum(shop.pick()$pref == "np"), caption = "未提供", icon="ion-help-circled",color='#efc640')
+})
+```
+
+Row2 {data-height=150}
+-----------------------------------------------------------------------
+
+### Taste
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$taste)
+valueBox(round(a, 2), caption = "味道", icon="ion-wineglass",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Environment
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$env)
+valueBox(round(a,2), caption = "環境", icon="ion-bonfire",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Service
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$serv)
+valueBox(round(a,2), caption = "服務", icon="ion-person-stalker",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Hygiene
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$hyg)
+valueBox(round(a,2), caption = "衛生", icon="ion-trash-a",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Value for Money
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$cp)
+valueBox(round(a,2), caption = "抵食", icon="ion-cash",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Total Rating
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$avg)
+valueBox(round(a,2), caption = "總分", icon="ion-grid",color = ifelse(a<3,"danger","success"))
+})
+```
+
+Row {data-height=80}
+-----------------------------------------------------------------------
+
+###
+```{r}
+#renderText({print("")})
+#renderText({print("網站評論數")})
+renderValueBox({
+valueBox("網站評論數", caption = " ",color='#5e3613')
+})
+```
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Smile
+```{r}
+renderValueBox({
+valueBox(sum(shop.sl()$pref == "smile"), caption = "開心", icon="ion-happy-outline",color='#efc640')
+})
+```
+
+### OK
+```{r}
+renderValueBox({
+valueBox(sum(shop.sl()$pref == "ok"), caption = "OK啦", icon="ion-checkmark",color='#efc640')
+})
+```
+
+### Cry
+```{r}
+renderValueBox({
+valueBox(sum(shop.sl()$pref == "cry"), caption = "唔掂", icon="ion-sad-outline",color='#efc640')
+})
+```
+
+### Not Provided
+```{r}
+renderValueBox({
+valueBox(sum(shop.sl()$pref == "np"), caption = "未提供", icon="ion-help-circled",color='#efc640')
+})
+```
+
+Row2 {data-height=150}
+-----------------------------------------------------------------------
+
+### Taste
+```{r}
+renderValueBox({
+a<-mean(shop.sl()$taste)
+valueBox(round(a, 2), caption = "味道", icon="ion-wineglass",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Environment
+```{r}
+renderValueBox({
+a<-mean(shop.sl()$env)
+valueBox(round(a,2), caption = "環境", icon="ion-bonfire",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Service
+```{r}
+renderValueBox({
+a<-mean(shop.sl()$serv)
+valueBox(round(a,2), caption = "服務", icon="ion-person-stalker",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Hygiene
+```{r}
+renderValueBox({
+a<-mean(shop.sl()$hyg)
+valueBox(round(a,2), caption = "衛生", icon="ion-trash-a",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Value for Money
+```{r}
+renderValueBox({
+a<-mean(shop.sl()$cp)
+valueBox(round(a,2), caption = "抵食", icon="ion-cash",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Total Rating
+```{r}
+renderValueBox({
+a<-mean(shop.sl()$avg)
+valueBox(round(a,2), caption = "總分", icon="ion-grid",color = ifelse(a<3,"danger","success"))
+})
+```
+
+每月數據 {data-orientation=rows}
+======================================================
+
+Column {.sidebar data-width=300 }
+-----------------------------------------------------------------------
+
+```{r}
+
+```
+Waiting time between
+
+Row {data-height=80}
+-----------------------------------------------------------------------
+
+###
+```{r}
+#renderText({print("")})
+renderValueBox({
+valueBox("已選定條件評論資料", caption = " ",color='#c17028')
+})
+```
+
+Row {data-height=150}
+-----------------------------------------------------------------------
+
+### Smile
+```{r}
+renderValueBox({
+valueBox(sum(shop.pick()$pref == "smile"), caption = "開心", icon="ion-happy-outline",color='#efc640')
+})
+```
+
+### OK
+```{r}
+renderValueBox({
+valueBox(sum(shop.pick()$pref == "ok"), caption = "OK啦", icon="ion-checkmark",color='#efc640')
+})
+```
+
+### Cry
+```{r}
+renderValueBox({
+valueBox(sum(shop.pick()$pref == "cry"), caption = "唔掂", icon="ion-sad-outline",color='#efc640')
+})
+```
+
+### Not Provided
+```{r}
+renderValueBox({
+valueBox(sum(shop.pick()$pref == "np"), caption = "未提供", icon="ion-help-circled",color='#efc640')
+})
+```
+
+Row2 {data-height=150}
+-----------------------------------------------------------------------
+
+### Taste
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$taste)
+valueBox(round(a, 2), caption = "味道", icon="ion-wineglass",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Environment
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$env)
+valueBox(round(a,2), caption = "環境", icon="ion-bonfire",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Service
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$serv)
+valueBox(round(a,2), caption = "服務", icon="ion-person-stalker",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Hygiene
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$hyg)
+valueBox(round(a,2), caption = "衛生", icon="ion-trash-a",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Value for Money
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$cp)
+valueBox(round(a,2), caption = "抵食", icon="ion-cash",color = ifelse(a<3,"danger","success"))
+})
+```
+
+### Total Rating
+```{r}
+renderValueBox({
+a<-mean(shop.pick()$avg)
+valueBox(round(a,2), caption = "總分", icon="ion-grid",color = ifelse(a<3,"danger","success"))
+})
+```
+
+
+Row {data-height=80}
+-----------------------------------------------------------------------
+
+###
+```{r}
+renderValueBox({
+valueBox("食評數及平均評分", caption = " ",color='#5e3613')
+})
+```
+
+Row3 {data-height=350 data-padding=20} 
+----------------------------------------------
+
+###
+
+```{r}
+renderPlotly({
+xx <- shop.pick()
+mthavg<-merge(aggregate(list(mth.avg = xx$avg), list(mon = cut(xx$date1, "1 month")), mean),
+      aggregate(list(mth.avg = xx$avg), list(mon = cut(xx$date1, "1 month")), length)
+      ,by = "mon")
+plot_ly(mthavg, x = ~mon, y = ~mth.avg.x, name = '平均評分',type = 'scatter',mode='line+markers') %>%
+add_trace(y = ~mth.avg.y, name = '食評數量',type = 'bar') #, mode = 'lines+markers'
+})
+render
+```
+
+
+文字雲 {data-orientation=rows}
+======================================================
+
+Column {.sidebar data-width=300 }
+-----------------------------------------------------------------------
+
+```{r}
+
+```
+
+Waiting time between
+
+
+Row {data-height=80}
+-----------------------------------------------------------------------
+
+###
+```{r}
+renderValueBox({
+valueBox("最多出現次數關𨫡字", caption = " ",color='#c17028')
+})
+```
+
+Row2 {data-height=200,data-width=600}
+----------------------------------------------
+
+```{r}
+renderTable({
+xx <-shop.pick()
+tt <-input$topx
+keys<-worker(user="dictionary.txt",stop_word = "stopword.txt",type="keywords",topn=tt, dict="jieba.dict.utf8",hmm="hmm_model.utf8",idf = "idf.utf8")
+mm<-paste(xx$comm,collapse=" ")
+topsh<-keys<=mm
+word<-as.vector(topsh)
+tfidf<-names(topsh)
+top<-cbind(word,tfidf)
+top.t <- t(top[,2:ncol(top)])
+colnames(top.t) <- top[,1]
+top.t <- t(top[,2:ncol(top)])
+colnames(top.t) <- top[,1]
+top.t
+})
+```
+
+Row {data-height=80}
+-----------------------------------------------------------------------
+
+###
+```{r}
+renderValueBox({
+valueBox("文字雲", caption = " ",color='#5e3613')
+})
+```
+
+Row3 {data-height=400}
+----------------------------------------------
+
+```{r}
+renderWordcloud2({
+aa <- shop.pick()
+bb <- input$wcsize
+f <- function(x) jseg <= x
+wc.cl <- as.vector(aa$comm)
+wc.cl <- str_replace_all(wc.cl,"[^\\w]|[\\d+]","")
+wc.cl <- gsub("0-9","",wc.cl)
+wc.cl <- gsub(" ","",wc.cl)
+wc.cl <- gsub('[:alpha:]',"",wc.cl)
+wc.cl <- llply(wc.cl%>%paste(collapse = ","),f)%>%llply(table)
+wc.fin <- data.frame(wc.cl)
+wordcloud2(wc.fin[wc.fin$Freq>bb,],minRotation = -pi/360, maxRotation = -pi/360, minSize = 5,rotateRatio = 1)
+})
+```
