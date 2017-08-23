@@ -15,14 +15,14 @@ for (query in c(1:10)){
     ###################################################################################################################
     result.comm <- read_html(paste('https://www.openrice.com/zh/hongkong/xxx',paste(query,'/xxx', sep=''),sep=''))
     result.home <- read_html(paste('https://www.openrice.com/zh/hongkong/xxx',paste(query,'/', sep=''),sep=''))
-    check.status<- html_nodes(result.comm, ".xxx-status")
-    check.name  <- html_nodes(result.comm, ".xxx .name")
-    check.count <- html_nodes(result.comm, ".xxx .active")
+    check.status<- html_nodes(result.comm, ".xxx")
+    check.name  <- html_nodes(result.comm, ".xxx")
+    check.count <- html_nodes(result.comm, ".xxx")
     
-    check.add   <- html_nodes(result.home, ".xxx a")
-    check.dist  <- html_nodes(result.home, ".xxx a")
-    check.price <- html_nodes(result.home, ".xxx a")
-    check.cat   <- html_nodes(result.home, ".xxx a")
+    check.add   <- html_nodes(result.home, ".xxx")
+    check.dist  <- html_nodes(result.home, ".xxx")
+    check.price <- html_nodes(result.home, ".xxx")
+    check.cat   <- html_nodes(result.home, ".xxx")
     
     address <-gsub(' ','',gsub("[\r\n]", "",paste(html_text(check.add),collapse="")))
     check1  <- paste(html_text(check.status),collapse=" ")
