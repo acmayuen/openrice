@@ -61,10 +61,6 @@ for (i in 1:10){
                   paste(shopid,
                         paste('/reviews?page=',page,sep=''),'', sep=''),sep='')
     
-    urls3 = paste('https://www.openrice.com/zh/hongkong/r-XXX-r',
-                 paste(shopid,
-                       paste('/reviews?page=',page,sep=''),'&isListView=True&scoreSmile=-1', sep=''),sep='')
-    
     read.comm <- read_html(urls1)
     read.comm2<- read_html(urls2)
     
